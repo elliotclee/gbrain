@@ -1,5 +1,7 @@
 node_modules/
 bin/
+dist/
+pnpm-lock.yaml
 .DS_Store
 *.log
 .env

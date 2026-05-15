@@ -68,9 +68,8 @@
     "compat": {
       "pluginApi": ">=2026.4.0"
     },
-    "extensions": [
-      "./src/openclaw-context-engine.ts"
-    ]
+    "extensions": [ "./src/openclaw-context-engine.ts" ],
+    "runtimeExtensions": [ "./dist/src/openclaw-context-engine.js" ]
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
