@@ -14,7 +14,7 @@
  */
 
 import type { BrainEngine } from './engine.ts';
-import { PGVECTOR_HNSW_VECTOR_MAX_DIMS } from './vector-index.ts';
+import { PGVECTOR_VCHORD_VECTOR_MAX_DIMS } from './vector-index.ts';
 
 export interface ColumnDimResult {
   /** Whether the `content_chunks.embedding` column exists. False on a fresh brain. */
@@ -81,10 +81,10 @@ export function embeddingMismatchMessage(opts: {
   source?: 'init' | 'doctor';
 }): string {
   const { currentDims, requestedDims, requestedModel, source } = opts;
-  const supportsHnsw = requestedDims <= PGVECTOR_HNSW_VECTOR_MAX_DIMS;
+  const supportsHnsw = requestedDims <= PGVECTOR_VCHORD_VECTOR_MAX_DIMS;
   const reindexLine = supportsHnsw
-    ? `CREATE INDEX IF NOT EXISTS idx_chunks_embedding\n  ON content_chunks USING hnsw (embedding vector_cosine_ops);`
-    : `-- Skip reindex. dims=${requestedDims} exceeds pgvector's HNSW cap of ${PGVECTOR_HNSW_VECTOR_MAX_DIMS};\n-- searchVector falls back to exact scan.`;
+    ? `CREATE INDEX IF NOT EXISTS idx_chunks_embedding\n  ON content_chunks USING vchordrq (embedding vector_cosine_ops);`
+    : `-- Skip reindex. dims=${requestedDims} exceeds pgvector's HNSW cap of ${PGVECTOR_VCHORD_VECTOR_MAX_DIMS};\n-- searchVector falls back to exact scan.`;
 
   const header = source === 'doctor'
     ? `Embedding dimension mismatch detected.`
