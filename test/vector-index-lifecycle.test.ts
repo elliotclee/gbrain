@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   chunkEmbeddingIndexSql,
   applyChunkEmbeddingIndexPolicy,
-  PGVECTOR_HNSW_VECTOR_MAX_DIMS,
+  PGVECTOR_VCHORD_VECTOR_MAX_DIMS,
   checkActiveBuild,
   dropZombieIndexes,
   dropAndRebuild,
@@ -15,7 +15,7 @@ describe('chunkEmbeddingIndexSql — pre-v0.30.1 contract', () => {
   test('emits CREATE INDEX for dims ≤ 2000', () => {
     const sql = chunkEmbeddingIndexSql(1536);
     expect(sql).toContain('CREATE INDEX IF NOT EXISTS idx_chunks_embedding');
-    expect(sql).toContain('hnsw');
+    expect(sql).toContain('vchordrq');
   });
 
   test('emits skip-comment for dims > 2000 (Voyage 3072)', () => {
@@ -24,20 +24,20 @@ describe('chunkEmbeddingIndexSql — pre-v0.30.1 contract', () => {
     expect(sql).not.toContain('CREATE INDEX');
   });
 
-  test('boundary at exactly PGVECTOR_HNSW_VECTOR_MAX_DIMS (2000)', () => {
-    const at = chunkEmbeddingIndexSql(PGVECTOR_HNSW_VECTOR_MAX_DIMS);
+  test('boundary at exactly PGVECTOR_VCHORD_VECTOR_MAX_DIMS (2000)', () => {
+    const at = chunkEmbeddingIndexSql(PGVECTOR_VCHORD_VECTOR_MAX_DIMS);
     expect(at).toContain('CREATE INDEX');
-    const above = chunkEmbeddingIndexSql(PGVECTOR_HNSW_VECTOR_MAX_DIMS + 1);
+    const above = chunkEmbeddingIndexSql(PGVECTOR_VCHORD_VECTOR_MAX_DIMS + 1);
     expect(above).toContain('skipped');
   });
 });
 
 describe('applyChunkEmbeddingIndexPolicy', () => {
   test('replaces the canonical index SQL', () => {
-    const input = `BEFORE\nCREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING hnsw (embedding vector_cosine_ops);\nAFTER`;
+    const input = `BEFORE\nCREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING vchordrq (embedding vector_cosine_ops);\nAFTER`;
     const out = applyChunkEmbeddingIndexPolicy(input, 1536);
     expect(out).toContain('idx_chunks_embedding');
-    const out2 = applyChunkEmbeddingIndexPolicy(input, 3072);
+    const out2 = applyChunkEmbeddingIndexPolicy(input, 307200);
     expect(out2).toContain('skipped');
   });
 });
@@ -161,7 +161,7 @@ describe('dropAndRebuild — A3 atomic-swap', () => {
       name: 'idx_chunks_embedding',
       table: 'content_chunks',
       column: 'embedding',
-      using: 'hnsw (embedding vector_cosine_ops)',
+      using: 'vchordrq (embedding vector_cosine_ops)',
     };
     const r = await dropAndRebuild(fakeEngine, spec, { reason: 'test' });
     expect(r.rebuilt).toBe(false);
@@ -183,7 +183,7 @@ describe('dropAndRebuild — A3 atomic-swap', () => {
       name: 'idx_chunks_embedding',
       table: 'content_chunks',
       column: 'embedding',
-      using: 'hnsw (embedding vector_cosine_ops)',
+      using: 'vchordrq (embedding vector_cosine_ops)',
     };
     const r = await dropAndRebuild(fakeEngine, spec, { reason: 'auto' });
     expect(r.rebuilt).toBe(false);
@@ -209,7 +209,7 @@ describe('dropAndRebuild — A3 atomic-swap', () => {
       name: 'idx_chunks_embedding',
       table: 'content_chunks',
       column: 'embedding',
-      using: 'hnsw (embedding vector_cosine_ops)',
+      using: 'vchordrq (embedding vector_cosine_ops)',
     };
     const r = await dropAndRebuild(fakeEngine, spec, { reason: 'test' });
     expect(r.rebuilt).toBe(true);

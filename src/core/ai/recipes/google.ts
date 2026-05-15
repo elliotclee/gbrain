@@ -11,8 +11,7 @@ export const google: Recipe = {
   },
   touchpoints: {
     embedding: {
-      models: ['gemini-embedding-001'],
-      models: ['gemini-embedding-2'],
+      models: ['gemini-embedding-2', 'gemini-embedding-001'],
       default_dims: 3072,
       dims_options: [768, 1536, 3072],
       cost_per_1m_tokens_usd: 0.15,

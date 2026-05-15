@@ -14,7 +14,7 @@ import { getRecipe } from '../../src/core/ai/recipes/index.ts';
 import { defaultResolveAuth } from '../../src/core/ai/gateway.ts';
 import { AIConfigError } from '../../src/core/ai/errors.ts';
 import {
-  PGVECTOR_HNSW_VECTOR_MAX_DIMS,
+  PGVECTOR_VCHORD_VECTOR_MAX_DIMS,
   chunkEmbeddingIndexSql,
 } from '../../src/core/vector-index.ts';
 
@@ -38,7 +38,7 @@ describe('recipe: zhipu', () => {
     expect(r.touchpoints.embedding!.dims_options).toEqual([256, 512, 1024, 2048]);
     // The default must stay HNSW-compatible.
     expect(r.touchpoints.embedding!.default_dims).toBeLessThanOrEqual(
-      PGVECTOR_HNSW_VECTOR_MAX_DIMS,
+      PGVECTOR_VCHORD_VECTOR_MAX_DIMS,
     );
   });
 
@@ -58,15 +58,15 @@ describe('recipe: zhipu', () => {
     // 2048d exceeds the HNSW cap, so chunkEmbeddingIndexSql returns the
     // exact-scan-skip-index path. Users picking 2048 trade ANN speed for
     // full embedding fidelity.
-    const sql = chunkEmbeddingIndexSql(2048);
+    const sql = chunkEmbeddingIndexSql(204800);
     expect(sql.toLowerCase()).toContain('skipped');
-    expect(sql.toLowerCase()).toContain('hnsw');
+    expect(sql.toLowerCase()).toContain('vchord');
   });
 
   test('1024-dim default returns the HNSW index SQL (fast path)', () => {
     const sql = chunkEmbeddingIndexSql(1024);
     expect(sql.toLowerCase()).toContain('create index');
-    expect(sql.toLowerCase()).toContain('hnsw');
+    expect(sql.toLowerCase()).toContain('vchord');
   });
 
   test('dimsProviderOptions threads dimensions for embedding-3 (Matryoshka)', async () => {
