@@ -13,23 +13,23 @@ export const openai: Recipe = {
   touchpoints: {
     embedding: {
       models: ['text-embedding-3-large', 'text-embedding-3-small'],
-      default_dims: 1536,
+      default_dims: 3072,
       dims_options: [256, 512, 768, 1024, 1536, 3072],
       cost_per_1m_tokens_usd: 0.13,
       price_last_verified: '2026-04-20',
     },
     expansion: {
-      models: ['gpt-5.2', 'gpt-4o-mini'],
+      models: ['gpt-5.5', 'gpt-4o-mini'],
       cost_per_1m_tokens_usd: 0.15,
       price_last_verified: '2026-04-20',
     },
     chat: {
-      models: ['gpt-5.2', 'gpt-4o-mini'],
+      models: ['gpt-5.5', 'gpt-4o-mini'],
       supports_tools: true,
       supports_subagent_loop: true,
       supports_prompt_cache: false,
       max_context_tokens: 200000,
-      cost_per_1m_input_usd: 1.25, // gpt-5.2 baseline
+      cost_per_1m_input_usd: 1.25, // gpt-5.5 baseline
       cost_per_1m_output_usd: 10.0,
       price_last_verified: '2026-04-20',
     },

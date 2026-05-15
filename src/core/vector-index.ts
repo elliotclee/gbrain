@@ -1,5 +1,5 @@
 /**
- * pgvector HNSW index policy + lifecycle manager (v0.30.1 Fix 5).
+ * pgvector vchord index policy + lifecycle manager (v0.30.1 Fix 5).
  *
  * Original v0.27 surface: chunkEmbeddingIndexSql / applyChunkEmbeddingIndexPolicy
  * (kept unchanged for back-compat — schema-time index emission).
@@ -16,21 +16,21 @@
 
 import type { BrainEngine } from './engine.ts';
 
-export const PGVECTOR_HNSW_VECTOR_MAX_DIMS = 2000;
+export const PGVECTOR_VCHORD_VECTOR_MAX_DIMS = 60000;
 
-const CHUNK_EMBEDDING_HNSW_INDEX =
-  'CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING hnsw (embedding vector_cosine_ops);';
+const CHUNK_EMBEDDING_VCHORD_INDEX =
+  'CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING vchordrq (embedding vector_cosine_ops);';
 
 export function chunkEmbeddingIndexSql(dims: number): string {
-  if (dims <= PGVECTOR_HNSW_VECTOR_MAX_DIMS) return CHUNK_EMBEDDING_HNSW_INDEX;
+  if (dims <= PGVECTOR_VCHORD_VECTOR_MAX_DIMS) return CHUNK_EMBEDDING_VCHORD_INDEX;
   return [
-    '-- idx_chunks_embedding skipped: pgvector HNSW vector indexes support',
-    `-- at most ${PGVECTOR_HNSW_VECTOR_MAX_DIMS} dimensions; exact vector scans remain available.`,
+    '-- idx_chunks_embedding skipped: pgvector vchord vector indexes support',
+    `-- at most ${PGVECTOR_VCHORD_VECTOR_MAX_DIMS} dimensions; exact vector scans remain available.`,
   ].join('\n');
 }
 
 export function applyChunkEmbeddingIndexPolicy(sql: string, dims: number): string {
-  return sql.replaceAll(CHUNK_EMBEDDING_HNSW_INDEX, chunkEmbeddingIndexSql(dims));
+  return sql.replaceAll(CHUNK_EMBEDDING_VCHORD_INDEX, chunkEmbeddingIndexSql(dims));
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ export interface IndexSpec {
   name: string;
   table: string;
   column: string;
-  /** USING clause body — e.g. `hnsw (embedding vector_cosine_ops)`. */
+  /** USING clause body — e.g. `vchordrq (embedding vector_cosine_ops)`. */
   using: string;
   /** Optional WHERE predicate (without WHERE keyword). */
   condition?: string;
@@ -89,7 +89,7 @@ export async function checkActiveBuild(
 }
 
 /**
- * Sweep invalid HNSW indexes on startup. Drops any pg_index row with
+ * Sweep invalid vchord indexes on startup. Drops any pg_index row with
  * indisvalid=false on tables we care about, AS LONG AS no active build
  * is running for that index (codex Fix-5 zombie-cleanup guard).
  *
@@ -116,21 +116,21 @@ export async function dropZombieIndexes(
       // Guard: skip if there's an active build for this index.
       const active = await checkActiveBuild(engine, r.indexname);
       if (active.active) {
-        process.stderr.write(`[hnsw] skipping zombie cleanup of ${r.indexname} — active build (pid ${active.pid})\n`);
+        process.stderr.write(`[vchord] skipping zombie cleanup of ${r.indexname} — active build (pid ${active.pid})\n`);
         continue;
       }
       try {
         await engine.executeRaw(`DROP INDEX IF EXISTS ${r.indexname}`);
         dropped.push(r.indexname);
-        process.stderr.write(`[hnsw] dropped zombie index ${r.indexname} on ${r.tablename}\n`);
+        process.stderr.write(`[vchord] dropped zombie index ${r.indexname} on ${r.tablename}\n`);
       } catch (err) {
-        process.stderr.write(`[hnsw] failed to drop ${r.indexname}: ${(err as Error).message}\n`);
+        process.stderr.write(`[vchord] failed to drop ${r.indexname}: ${(err as Error).message}\n`);
       }
     }
   } catch (err) {
     // Best-effort: pg_stat_activity / pg_index queries may be restricted
     // on managed Postgres tiers. Don't fail engine.connect() over it.
-    process.stderr.write(`[hnsw] zombie-index probe failed: ${(err as Error).message}\n`);
+    process.stderr.write(`[vchord] zombie-index probe failed: ${(err as Error).message}\n`);
   }
   return { dropped };
 }
@@ -163,7 +163,7 @@ export async function dropAndRebuild(
   const active = await checkActiveBuild(engine, spec.name);
   if (active.active && !opts.force) {
     process.stderr.write(
-      `[hnsw] dropAndRebuild ${spec.name} aborted: active build pid ${active.pid} (${active.application_name ?? 'unknown'}). Pass --force to proceed anyway.\n`,
+      `[vchord] dropAndRebuild ${spec.name} aborted: active build pid ${active.pid} (${active.application_name ?? 'unknown'}). Pass --force to proceed anyway.\n`,
     );
     return { rebuilt: false, tempName: spec.name };
   }
@@ -172,7 +172,7 @@ export async function dropAndRebuild(
   const tempName = `${spec.name}_rebuild_${ts}`;
   const where = spec.condition ? ` WHERE ${spec.condition}` : '';
 
-  process.stderr.write(`[hnsw] rebuild ${spec.name} → ${tempName} (reason=${opts.reason})\n`);
+  process.stderr.write(`[vchord] rebuild ${spec.name} → ${tempName} (reason=${opts.reason})\n`);
 
   // Step 3: build the new index (CONCURRENTLY) under a reserved connection.
   await engine.withReservedConnection(async conn => {
@@ -190,7 +190,7 @@ export async function dropAndRebuild(
     }
   });
 
-  process.stderr.write(`[hnsw] rebuild complete: ${spec.name}\n`);
+  process.stderr.write(`[vchord] rebuild complete: ${spec.name}\n`);
   return { rebuilt: true, tempName };
 }
 

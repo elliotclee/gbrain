@@ -1,6 +1,7 @@
 -- GBrain Postgres + pgvector schema
 
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS vchord;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- gen_random_uuid() is core in Postgres 13+; enable pgcrypto as fallback for older versions
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -160,14 +161,14 @@ CREATE TABLE IF NOT EXISTS content_chunks (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_page_index ON content_chunks(page_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_chunks_page ON content_chunks(page_id);
-CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING vchordrq (embedding vector_cosine_ops);
 -- v0.19.0: partial indexes — only code chunks populate these columns.
 CREATE INDEX IF NOT EXISTS idx_chunks_symbol_name ON content_chunks(symbol_name) WHERE symbol_name IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_chunks_language ON content_chunks(language) WHERE language IS NOT NULL;
 -- v0.27.1: partial HNSW for multimodal images. Footprint stays proportional
 -- to image-chunk count, not table size.
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding_image
-  ON content_chunks USING hnsw (embedding_image vector_cosine_ops)
+  ON content_chunks USING vchordrq (embedding_image vector_cosine_ops)
   WHERE embedding_image IS NOT NULL;
 -- v0.20.0 Cathedral II: GIN index on the new chunk-grain FTS vector.
 CREATE INDEX IF NOT EXISTS idx_chunks_search_vector ON content_chunks USING GIN(search_vector);
@@ -374,8 +375,8 @@ CREATE TABLE IF NOT EXISTS config (
 
 INSERT INTO config (key, value) VALUES
   ('version', '1'),
-  ('embedding_model', 'text-embedding-3-large'),
-  ('embedding_dimensions', '1536'),
+  ('embedding_model', 'gemini-embedding-2'),
+  ('embedding_dimensions', '3072'),
   ('chunk_strategy', 'semantic')
 ON CONFLICT (key) DO NOTHING;
 

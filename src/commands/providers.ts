@@ -138,7 +138,7 @@ async function runTest(args: string[]): Promise<void> {
     const modelId = modelParts.join(':');
     const recipe = getRecipe(providerId);
     if (tpArg === 'embedding') {
-      const dims = recipe?.touchpoints.embedding?.default_dims ?? 1536;
+      const dims = recipe?.touchpoints.embedding?.default_dims ?? 3072;
       configureGateway({
         embedding_model: modelArg,
         embedding_dimensions: dims,
@@ -382,7 +382,7 @@ function pickRecommended(options: ProviderOption[], env: Record<string, boolean>
   const embOpts = options.filter(o => o.touchpoint === 'embedding');
   if (env.OPENAI_API_KEY) {
     const openai = embOpts.find(o => o.id.startsWith('openai:'));
-    if (openai) return { id: openai.id, reason: 'OPENAI_API_KEY set — OpenAI default is high-quality and preserves existing 1536-dim schema.' };
+    if (openai) return { id: openai.id, reason: 'OPENAI_API_KEY set — OpenAI default is high-quality and preserves existing 3072-dim schema.' };
   }
   if (ollamaReady) {
     const ollama = embOpts.find(o => o.id.startsWith('ollama:'));
@@ -390,7 +390,7 @@ function pickRecommended(options: ProviderOption[], env: Record<string, boolean>
   }
   if (env.GOOGLE_GENERATIVE_AI_API_KEY) {
     const google = embOpts.find(o => o.id.startsWith('google:'));
-    if (google) return { id: google.id, reason: 'GOOGLE_GENERATIVE_AI_API_KEY set — Gemini embedding at 768 dims.' };
+    if (google) return { id: google.id, reason: 'GOOGLE_GENERATIVE_AI_API_KEY set — Gemini embedding at 3072 dims.' };
   }
   if (env.VOYAGE_API_KEY) {
     const voyage = embOpts.find(o => o.id.startsWith('voyage:'));

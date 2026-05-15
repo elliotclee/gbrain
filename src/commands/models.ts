@@ -227,7 +227,7 @@ async function probeEmbeddingConfig(): Promise<ProbeResult> {
 
     // ZeroEntropy zembed-1 flexible-dim check. Same bug class as Voyage:
     // `embedding_model: zeroentropyai:zembed-1` configured without
-    // `embedding_dimensions` falls back to DEFAULT_EMBEDDING_DIMENSIONS=1536
+    // `embedding_dimensions` falls back to DEFAULT_EMBEDDING_DIMENSIONS=3072
     // (an OpenAI default) which ZE doesn't accept.
     if (providerId === 'zeroentropyai' && supportsZeroEntropyDimension(modelId)) {
       if (!isValidZeroEntropyDim(dims)) {
