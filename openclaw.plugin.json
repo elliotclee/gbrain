@@ -1,7 +1,8 @@
 {
-  "id": "gbrain",
+  "id": "gbrain-context",
   "version": "0.32.3.0",
   "description": "Personal knowledge brain with Postgres + pgvector hybrid search",
+  "kind": "context-engine",
   "family": "bundle-plugin",
   "configSchema": {
     "database_url": {
