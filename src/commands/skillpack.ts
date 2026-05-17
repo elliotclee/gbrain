@@ -124,13 +124,13 @@ async function runList(args: string[]): Promise<void> {
     });
     console.log(
       JSON.stringify(
-        { name: manifest.name, version: manifest.version, skills: entries },
+        { name: manifest.id, version: manifest.version, skills: entries },
         null,
         2,
       ),
     );
   } else {
-    console.log(`${manifest.name} ${manifest.version} bundle — ${slugs.length} skills:`);
+    console.log(`${manifest.id} ${manifest.version} bundle — ${slugs.length} skills:`);
     for (const slug of slugs) {
       console.log(`  ${slug}`);
     }

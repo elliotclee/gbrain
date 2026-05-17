@@ -11,7 +11,7 @@ import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, dirname, isAbsolute, resolve } from 'path';
 
 export interface BundleManifest {
-  name: string;
+  id: string;
   version: string;
   description?: string;
   skills: string[]; // e.g. "skills/brain-ops" (relative to gbrain root)
@@ -90,9 +90,9 @@ export function loadBundleManifest(gbrainRoot: string): BundleManifest {
     );
   }
   const m = parsed as Partial<BundleManifest>;
-  if (typeof m.name !== 'string' || typeof m.version !== 'string') {
+  if (typeof m.id !== 'string' || typeof m.version !== 'string') {
     throw new BundleError(
-      'openclaw.plugin.json: name and version must be strings',
+      'openclaw.plugin.json: id and version must be strings',
       'manifest_malformed',
     );
   }
