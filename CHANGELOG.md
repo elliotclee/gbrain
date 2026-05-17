@@ -2,6 +2,86 @@
 
 All notable changes to GBrain will be documented in this file.
 
+## [0.35.1.1] - 2026-05-16
+
+**Fix wave: `gbrain eval longmemeval` actually runs against the public _s split.**
+
+A pre-spend smoke for the upcoming embedder shootout caught three tightly-coupled bugs that would have made all 7 cells fail. Shipping the fixes before anyone burns judge tokens.
+
+### What this fixes
+
+**The longmemeval adapter accepts the public _s dataset shape.** Pre-v0.35.1.1 assumed every dataset used the oracle `{session_id, turns}` shape, but the HuggingFace _s split serializes sessions as a parallel `haystack_session_ids: string[]` + a `LongMemEvalTurn[][]` (each inner array is one session's turns directly). The old adapter crashed `session.turns is undefined` on every question. New `normalizeSessions` helper accepts both shapes, mirroring the proven path in `gbrain-evals/eval/runner/longmemeval.ts`.
+
+**Session IDs that contain underscores or uppercase letters now produce valid slugs.** The _s split's IDs look like `sharegpt_yywfIrx_0`, both of which the v0.32.7 CJK-wave slug validator rejects. New `sanitizeSessionIdForSlug` lowercases and rewrites disallowed chars to `-`. The frontmatter `session_id:` line still carries the original verbatim, so downstream JSONL emit + LongMemEval correctness scoring work unchanged — only the slug gets rewritten to satisfy the validator.
+
+**`gbrain eval longmemeval` now configures the AI gateway before running.** v0.28.8 deliberately skipped `connectEngine()` for this subcommand so it would run on machines without a configured brain. Side effect: the gateway never got configured either, so the first embed call inside `importFromContent` crashed with "AI gateway is not configured." Fix: explicit `configureGateway()` before `runEvalLongMemEval`, reading `~/.gbrain/config.json` if present and falling back to env vars (`GBRAIN_EMBEDDING_MODEL`, `GBRAIN_EMBEDDING_DIMENSIONS`, etc.) when there's no config — preserving the "runs on a fresh machine" property.
+
+### Itemized changes
+
+- `src/eval/longmemeval/adapter.ts`: new `normalizeSessions` accepts both oracle (`{session_id, turns}`) and _s (`Turn[][]` + parallel `haystack_session_ids`) shapes; new `sanitizeSessionIdForSlug` rewrites underscores + uppercase + other disallowed chars to `-`; `LongMemEvalQuestion.haystack_sessions` typed as the union, `haystack_session_ids?: string[]` field added with documentation.
+- `src/cli.ts`: gateway configure step added before the `eval longmemeval` dispatch path, gated on `--help` short-circuit so help still works without a configured gateway.
+- `test/eval-longmemeval.test.ts`: 2 new regression cases pinning the _s shape normalization end-to-end (slugs sanitized, frontmatter preserves original session_id, dates flow through) and the missing-haystack_session_ids fallback to synthesized `lme_<question_id>_<i>` ids.
+
+## To take advantage of v0.35.1.1
+
+`gbrain upgrade` handles the fix transparently. Re-run any LongMemEval-against-_s-split commands that had been crashing.
+
+1. **Upgrade:**
+   ```bash
+   gbrain upgrade
+   ```
+2. **(If you hit the prior crash) re-run with `--resume-from` to skip any questions already scored:**
+   ```bash
+   gbrain eval longmemeval ~/datasets/longmemeval/longmemeval_s.json \
+     --output results.jsonl --resume-from results.jsonl --mode tokenmax
+   ```
+3. **No migration, no schema change, no breaking semantics.**
+
+## [0.35.1.0] - 2026-05-15
+
+**Embedder shootout prereqs: pricing, public gateway export, and resume-from for long eval runs.**
+
+A focused infrastructure release setting up the upcoming OpenAI vs Voyage vs ZeroEntropy comparison documented in `docs/designs/2026_05_EVAL_PLAN.md`. Three changes, each independently useful: `gbrain upgrade` now estimates costs correctly for `voyage:voyage-4-large` and `zeroentropyai:zembed-1` (previously fell through to "estimate unavailable"); external eval consumers can swap embedding providers per cell via the newly-public `gbrain/ai/gateway` subpath; multi-hour LongMemEval runs survive mid-run aborts via `--resume-from`.
+
+### What you can now do
+
+**See real cost estimates for Voyage 4 Large and ZeroEntropy zembed-1.** Before this release, `gbrain upgrade`'s post-upgrade reembed prompt silently fell back to "estimate unavailable" for these two models, even though both shipped with first-class recipe support in v0.35.0.0. Now: `voyage:voyage-4-large` resolves at $0.18/MTok (matching voyage-3-large) and `zeroentropyai:zembed-1` at $0.05/MTok. The lookup is case-insensitive on the provider name and falls back cleanly on unknown providers — no fabricated numbers.
+
+**Drive gbrain's embedding gateway from outside the binary.** `package.json` exports gain `gbrain/ai/gateway` so external consumers (`gbrain-evals`, custom eval harnesses, third-party integrations) can call `configureGateway({embedding_model, embedding_dimensions, reranker_model})` directly instead of forking gbrain or duplicating the recipe wiring. This unblocks per-cell provider swapping in eval matrices without a brain DB. The exports surface count goes 17→18, locked by the canary contract test.
+
+**Resume a half-finished LongMemEval run instead of re-paying $50.** `gbrain eval longmemeval --resume-from <jsonl>` skips question_ids already present in the file and continues writing the remaining questions in append mode. Rows whose `hypothesis` is empty AND have an `error` field (per-question failures from a prior run's try/catch) are NOT skipped — those retry. Corrupt trailing lines from a SIGKILL'd writer are silently dropped with a stderr warn. Empty-resume case (every question already answered) returns immediately without spinning up the brain or calling the LLM.
+
+### Itemized changes
+
+- `src/core/embedding-pricing.ts` adds `voyage:voyage-4-large` ($0.18/MTok) and `zeroentropyai:zembed-1` ($0.05/MTok). New test file `test/embedding-pricing.test.ts` pins both entries, case-insensitive provider matching, bare-model openai-default fallback, table integrity (lowercase providers, finite non-negative prices), and the `estimateCostFromChars` approximation — 11 cases, 46 expect() calls.
+- `package.json` exports map adds `"./ai/gateway": "./src/core/ai/gateway.ts"`. `scripts/check-exports-count.sh` bumps `EXPECTED_COUNT` 17→18. `test/public-exports.test.ts` adds canary entries for `configureGateway` and `embed` symbols and bumps the inline count assertion. The pre-existing import-resolution failures in this test file are unchanged (longstanding Bun package self-import behavior, not introduced or worsened by this release).
+- `src/commands/eval-longmemeval.ts` adds `--resume-from <path>` CLI flag. New exported helper `loadResumeSet(path)` is the parser (file-not-found → empty set; corrupt lines silently skipped; error-rows retry). `makeEmitter()` takes a second `append` arg; runner sets it true when `--resume-from path === --output path`. 6 new test cases in `test/eval-longmemeval.test.ts` covering file-not-found, well-formed load, retry semantics, SIGKILL-recovery corrupt-line tolerance, end-to-end append-mode resume against the 5-question mini fixture, and all-done early-return (stub client must NOT be invoked).
+
+## To take advantage of v0.35.1.0
+
+`gbrain upgrade` handles the pricing-table refresh transparently. The new gateway export and `--resume-from` flag are additive — no migration required, nothing breaks if you don't use them.
+
+1. **Run the orchestrator:**
+   ```bash
+   gbrain upgrade
+   ```
+2. **(Eval consumers only) Use the new gateway export.** External code can now:
+   ```ts
+   import { configureGateway, embed } from 'gbrain/ai/gateway';
+   configureGateway({ embedding_model: 'voyage:voyage-4-large', embedding_dimensions: 2048 });
+   const vectors = await embed(['hello']);
+   ```
+3. **(Long eval runs only) Use `--resume-from` to recover from mid-run aborts:**
+   ```bash
+   # First run aborts at question 312:
+   gbrain eval longmemeval dataset.jsonl --output results.jsonl
+
+   # Resume:
+   gbrain eval longmemeval dataset.jsonl --output results.jsonl --resume-from results.jsonl
+   ```
+4. **If anything looks off,** `gbrain doctor` should be clean. File an issue at
+   https://github.com/garrytan/gbrain/issues with `gbrain doctor` output if not.
+
 ## [0.35.0.0] - 2026-05-15
 
 **ZeroEntropy in the box: zembed-1 embeddings + zerank-2 cross-encoder reranking, on by default for tokenmax mode.**
